@@ -50,7 +50,9 @@
 		parent:					null,   // Parent of this Actor. May be Scene.
 		x:						0,      // x position on parent. In parent's local coord. system.
 		y:						0,      // y position on parent. In parent's local coord. system.
-		width:					0,      // Actor's width. In parent's local coord. system.
+		drawoffsetx:             0,
+        drawoffsety:             0,
+        width:					0,      // Actor's width. In parent's local coord. system.
 		height:					0,      // Actor's height. In parent's local coord. system.
 		start_time:				0,      // Start time in Scene time.
 		duration:				Number.MAX_VALUE,   // Actor duration in Scene time
@@ -88,6 +90,7 @@
 		fillStyle:				null,   // any canvas rendering valid fill style.
         strokeStyle:            null,   // any canvas rendering valid stroke style.
         time:                   0,      // Cache Scene time.
+        cacheimg:               null,   // Cache img camvas.
         AABB:                   null,   // CAAT.Rectangle
         viewVertices:           null,   // model to view transformed vertices.
         inFrame:                false,  // boolean indicating whether this Actor was present on last frame.
@@ -331,6 +334,14 @@
             }
             */
 		},
+
+        paintCache : function(director,time){
+            var ctx= director.crc;
+            ctx.globalCompositeOperation= this.compositeOp;
+            ctx.drawImage(this.cacheimg,0,0);
+        },
+
+
         /**
          * A helper method to setScaleAnchored with an anchor of ANCHOR_CENTER
          *
@@ -550,9 +561,10 @@
          *
          * @return this
          */
-		create : function()	{
-            var i;
-            
+		create : function(x,y)	{
+            //var i; BORRAR
+            this.drawoffsetx=x || 0;
+            this.drawoffsety=y || 0;
 	    	this.scaleAnchor= this.ANCHOR_CENTER;
 	    	this.rotateAnchor= this.ANCHOR_CENTER;
 	    	this.setScale(1,1);
@@ -917,7 +929,7 @@
 
                 var m= new CAAT.Matrix();
 
-                this.modelViewMatrix.multiply( m.setTranslate( this.x, this.y ) );
+                this.modelViewMatrix.multiply( m.setTranslate( this.x+this.drawoffsetx, this.y+this.drawoffsety ) );
                 if ( this.rotationAngle ) {
                     this.modelViewMatrix.multiply( m.setTranslate( this.rotationX, this.rotationY) );
                     this.modelViewMatrix.multiply( m.setRotation( this.rotationAngle ) );
@@ -981,10 +993,14 @@
                 canvas.clip();
             }
 
-            this.paint(director, time);
+            (!this.cacheimg)? this.paint(director, time):this.paintCache(director, time);
 
             return true;
         },
+
+
+
+
         /**
          * Set coordinates and uv values for this actor.
          * This function uses Director's coords and indexCoords values.
@@ -1110,10 +1126,12 @@
          * @return canvas
          */
         cacheAsBitmap : function(time) {
+            if(this.cacheimg) return this.cacheimg;
             time= time||0;
             var canvas= document.createElement('canvas');
             canvas.width= this.width;
             canvas.height= this.height;
+
             var ctx= canvas.getContext('2d');
             var director= {
                 ctx: ctx,
@@ -1121,8 +1139,17 @@
             };
 
             this.paintActor(director,time);
-            return canvas;
+            this.cacheimg=canvas;
+            return this;
+        },
+
+        unCacheAsBitmap : function() {
+
+            this.cacheimg=null;
+            return this;
         }
+
+
 	};
 
 })();
@@ -2293,6 +2320,7 @@
     CAAT.ShapeActor = function() {
         CAAT.ShapeActor.superclass.constructor.call(this);
         this.compositeOp= 'source-over';
+        this.setShape(this.shape);
         return this;
     };
 
@@ -2312,6 +2340,7 @@
          */
         setShape : function(iShape) {
             this.shape= iShape;
+            this.paint=(this.shape==this.SHAPE_CIRCLE)? this.paintCircle : this.paintRectangle;
             return this;
         },
         /**
@@ -2331,14 +2360,14 @@
          * @param time an integer with the Scene time the Actor is being drawn.
          */
         paint : function(director,time) {
-            switch(this.shape) {
+            /*switch(this.shape) {
                 case 0:
                     this.paintCircle(director,time);
                     break;
                 case 1:
                     this.paintRectangle(director,time);
                     break;
-            }
+            }*/
         },
         /**
          * @private
